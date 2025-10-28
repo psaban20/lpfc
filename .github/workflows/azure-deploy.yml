@@ -1,0 +1,92 @@
+name: Build and Deploy to Azure Container Apps
+
+on:
+  push:
+    branches: [ master, main ]
+  pull_request:
+    branches: [ master, main ]
+  workflow_dispatch:
+
+env:
+  AZURE_REGISTRY: lpfcregistry.azurecr.io
+  BACKEND_IMAGE: lpfc-backend
+  FRONTEND_IMAGE: lpfc-frontend
+  RESOURCE_GROUP: LPFC-Resource-Group
+  BACKEND_APP_NAME: lpfc-backend-app
+  FRONTEND_APP_NAME: lpfc-frontend-app
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install backend dependencies
+        run: |
+          cd backend
+          pip install -r requirements.txt
+
+      - name: Run backend health check
+        run: |
+          cd backend
+          python -c "import app.models; print('Backend models loaded successfully')"
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '20'
+
+      - name: Install frontend dependencies
+        run: |
+          cd frontend
+          npm install
+
+      - name: Build frontend
+        run: |
+          cd frontend
+          npm run build
+
+  deploy:
+    needs: build-and-test
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main')
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Azure Login
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Log in to Azure Container Registry
+        run: |
+          az acr login --name lpfcregistry
+
+      - name: Build and push backend image
+        run: |
+          docker build -t lpfcregistry.azurecr.io/lpfc-backend:${{ github.sha }} -t lpfcregistry.azurecr.io/lpfc-backend:latest ./backend
+          docker push lpfcregistry.azurecr.io/lpfc-backend:${{ github.sha }}
+          docker push lpfcregistry.azurecr.io/lpfc-backend:latest
+
+      - name: Build and push frontend image
+        run: |
+          docker build -t lpfcregistry.azurecr.io/lpfc-frontend:${{ github.sha }} -t lpfcregistry.azurecr.io/lpfc-frontend:latest ./frontend
+          docker push lpfcregistry.azurecr.io/lpfc-frontend:${{ github.sha }}
+          docker push lpfcregistry.azurecr.io/lpfc-frontend:latest
+
+      - name: Deploy backend to Azure Container Apps
+        run: |
+          az containerapp update --name lpfc-backend-app --resource-group LPFC-Resource-Group --image lpfcregistry.azurecr.io/lpfc-backend:${{ github.sha }}
+
+      - name: Deploy frontend to Azure Container Apps
+        run: |
+          BACKEND_URL=$(az containerapp show --name lpfc-backend-app --resource-group LPFC-Resource-Group --query properties.configuration.ingress.fqdn -o tsv)
+          az containerapp update --name lpfc-frontend-app --resource-group LPFC-Resource-Group --image lpfcregistry.azurecr.io/lpfc-frontend:${{ github.sha }} --set-env-vars NEXT_PUBLIC_API_URL=https://$BACKEND_URL
