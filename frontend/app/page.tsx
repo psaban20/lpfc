@@ -44,6 +44,7 @@ interface DivisionStats {
   ProgramYear: number;
   ProgramName: string;
   DivisionName: string;
+  DivisionGender: string;
   Players: number;
 }
 
