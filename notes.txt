@@ -1,0 +1,9 @@
+Considering the schema.sql and enrollment.sql please write a python fastAPI, dockerized using docker desktop on windows.  Please provide the necessary endpoints.
+
+Then right a next.js frontend dashboard that shows the info beautifully in both table format and charts.
+
+
+Azure Sql Server
+host:lpfc.database.windows.net
+user: appuser@lpfc.database.windows.net
+password: !Jenn1980

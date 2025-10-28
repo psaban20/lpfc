@@ -1,0 +1,44 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: lpfc-backend
+    ports:
+      - "8001:8000"
+    environment:
+      - DB_HOST=lpfc.database.windows.net
+      - DB_USER=appuser@lpfc.database.windows.net
+      - DB_PASSWORD=${DB_PASSWORD}
+      - DB_NAME=LPFC-DB
+      - DB_DRIVER=ODBC Driver 18 for SQL Server
+    volumes:
+      - ./backend:/app
+    restart: unless-stopped
+    networks:
+      - lpfc-network
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: lpfc-frontend
+    ports:
+      - "3001:3000"
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:8001
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+      - /app/.next
+    depends_on:
+      - backend
+    restart: unless-stopped
+    networks:
+      - lpfc-network
+
+networks:
+  lpfc-network:
+    driver: bridge
