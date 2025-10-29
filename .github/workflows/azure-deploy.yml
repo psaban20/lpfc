@@ -84,9 +84,54 @@ jobs:
 
       - name: Deploy backend to Azure Container Apps
         run: |
-          az containerapp update --name lpfc-backend-app --resource-group LPFC-Resource-Group --image lpfcregistry.azurecr.io/lpfc-backend:${{ github.sha }}
+          if az containerapp show --name lpfc-backend-app --resource-group LPFC-Resource-Group &>/dev/null; then
+            echo "Updating existing backend app..."
+            az containerapp update \
+              --name lpfc-backend-app \
+              --resource-group LPFC-Resource-Group \
+              --image lpfcregistry.azurecr.io/lpfc-backend:${{ github.sha }}
+          else
+            echo "Creating new backend app..."
+            az containerapp create \
+              --name lpfc-backend-app \
+              --resource-group LPFC-Resource-Group \
+              --environment lpfc-environment \
+              --image lpfcregistry.azurecr.io/lpfc-backend:${{ github.sha }} \
+              --target-port 8000 \
+              --ingress external \
+              --registry-server lpfcregistry.azurecr.io \
+              --env-vars \
+                DB_SERVER=lpfc.database.windows.net \
+                DB_DATABASE=lpfc \
+                DB_USERNAME=appuser@lpfc.database.windows.net \
+                DB_PASSWORD=secretref:db-password \
+              --secrets db-password='!Jenn1980' \
+              --cpu 0.5 \
+              --memory 1Gi
+          fi
 
       - name: Deploy frontend to Azure Container Apps
         run: |
           BACKEND_URL=$(az containerapp show --name lpfc-backend-app --resource-group LPFC-Resource-Group --query properties.configuration.ingress.fqdn -o tsv)
-          az containerapp update --name lpfc-frontend-app --resource-group LPFC-Resource-Group --image lpfcregistry.azurecr.io/lpfc-frontend:${{ github.sha }} --set-env-vars NEXT_PUBLIC_API_URL=https://$BACKEND_URL
+
+          if az containerapp show --name lpfc-frontend-app --resource-group LPFC-Resource-Group &>/dev/null; then
+            echo "Updating existing frontend app..."
+            az containerapp update \
+              --name lpfc-frontend-app \
+              --resource-group LPFC-Resource-Group \
+              --image lpfcregistry.azurecr.io/lpfc-frontend:${{ github.sha }} \
+              --set-env-vars NEXT_PUBLIC_API_URL=https://$BACKEND_URL
+          else
+            echo "Creating new frontend app..."
+            az containerapp create \
+              --name lpfc-frontend-app \
+              --resource-group LPFC-Resource-Group \
+              --environment lpfc-environment \
+              --image lpfcregistry.azurecr.io/lpfc-frontend:${{ github.sha }} \
+              --target-port 3000 \
+              --ingress external \
+              --registry-server lpfcregistry.azurecr.io \
+              --env-vars NEXT_PUBLIC_API_URL=https://$BACKEND_URL \
+              --cpu 0.5 \
+              --memory 1Gi
+          fi
