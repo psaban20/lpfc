@@ -101,9 +101,9 @@ jobs:
               --ingress external \
               --registry-server lpfcregistry.azurecr.io \
               --env-vars \
-                DB_SERVER=lpfc.database.windows.net \
-                DB_DATABASE=lpfc \
-                DB_USERNAME=appuser@lpfc.database.windows.net \
+                DB_HOST=lpfc.database.windows.net \
+                DB_NAME=LPFC-DB \
+                DB_USER=appuser \
                 DB_PASSWORD=secretref:db-password \
               --secrets db-password='!Jenn1980' \
               --cpu 0.5 \
